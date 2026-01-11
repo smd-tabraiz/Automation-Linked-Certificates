@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+
+# Logs
+logs.txt
+
+# Uploads and generated files
+uploads/
+certificates_renamed/
+
+# CSV & certificates
+*.csv
+*.png
+*.jpg
+*.jpeg
+*.pdf
+
+# Environment
+.env

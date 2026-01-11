@@ -10,23 +10,48 @@
 
 <div class="container mt-5">
     <div class="row justify-content-center">
-        <div class="col-md-8">
+        <div class="col-md-10">
 
             <div class="card shadow">
                 <div class="card-body text-center">
 
                     <h3 class="mb-4">📨 Certificate Sending Status</h3>
 
-                    <!-- FLASH MESSAGES -->
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                      {% if messages %}
-                        {% for category, message in messages %}
-                          <div class="alert alert-{{ category }}">
-                            {{ message }}
-                          </div>
-                        {% endfor %}
-                      {% endif %}
-                    {% endwith %}
+                    <!-- SUMMARY CARDS -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h6>Total</h6>
+                                    <h2>{{ total }}</h2>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card shadow-sm border-success">
+                                <div class="card-body text-success">
+                                    <h6>Sent Successfully</h6>
+                                    <h2>{{ sent }}</h2>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card shadow-sm border-danger">
+                                <div class="card-body text-danger">
+                                    <h6>Failed</h6>
+                                    <h2>{{ failed }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if failed > 0 %}
+                    <div class="alert alert-warning">
+                        ⚠️ Some certificates could not be sent. Please check logs.
+                    </div>
+                    {% endif %}
 
                     <div class="d-grid gap-2 mt-4">
                         <a href="/" class="btn btn-primary">

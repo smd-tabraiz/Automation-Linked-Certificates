@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 import os
 import csv
 
@@ -8,6 +8,7 @@ from services.email_service import send_certificates
 app = Flask(__name__)
 app.secret_key = "9fb28e216def0dfbb430f1bcb12c30e1caa20e2d12cee3a3e490aab30a4a3d6a"
 
+# ================= CONFIG =================
 UPLOAD_CSV = "uploads/csv"
 UPLOAD_CERTS = "uploads/certificates"
 RENAMED_FOLDER = "certificates_renamed"
@@ -17,12 +18,10 @@ os.makedirs(UPLOAD_CSV, exist_ok=True)
 os.makedirs(UPLOAD_CERTS, exist_ok=True)
 os.makedirs(RENAMED_FOLDER, exist_ok=True)
 
-
 # ================= INDEX =================
 @app.route("/")
 def index():
     return render_template("index.html")
-
 
 # ================= PREVIEW =================
 @app.route("/preview", methods=["POST"])
@@ -52,13 +51,10 @@ def preview():
             name = row["name"]
             email = row["email"]
 
-            cert_found = False
             cert_name = "Missing"
-
             for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
                 path = os.path.join(UPLOAD_CERTS, f"{idx}{ext}")
                 if os.path.exists(path):
-                    cert_found = True
                     cert_name = f"{idx}{ext}"
                     break
 
@@ -66,7 +62,7 @@ def preview():
                 "name": name,
                 "email": email,
                 "certificate": cert_name,
-                "status": "Ready" if cert_found else "Missing"
+                "status": "Ready" if cert_name != "Missing" else "Missing"
             })
 
     return render_template(
@@ -75,12 +71,15 @@ def preview():
         csv_filename=csv_file.filename
     )
 
-
-# ================= RESULT PAGE =================
+# ================= RESULT =================
 @app.route("/preview-result")
 def preview_result():
-    return render_template("preview_result.html")
-
+    return render_template(
+        "preview_result.html",
+        total=session.get("total", 0),
+        sent=session.get("sent", 0),
+        failed=session.get("failed", 0)
+    )
 
 # ================= SEND =================
 @app.route("/process", methods=["POST"])
@@ -91,36 +90,43 @@ def process():
             return redirect(url_for("index"))
 
         sender_email = request.form["sender_email"]
-        app_password = request.form["app_password"]
+        sendgrid_api_key = request.form["app_password"]  # SendGrid API Key
         subject = request.form["subject"]
+        email_body = request.form.get("email_body", "")  # ✅ NEW
         csv_filename = request.form["csv_filename"]
+
+        # Basic API key validation
+        if not sendgrid_api_key.startswith("SG."):
+            flash("Invalid SendGrid API Key", "danger")
+            return redirect(url_for("index"))
 
         csv_path = os.path.join(UPLOAD_CSV, csv_filename)
 
+        # Rename certificates
         rename_certificates(csv_path, UPLOAD_CERTS, RENAMED_FOLDER)
 
+        # Send emails (UPDATED CALL)
         sent_count, failed_count = send_certificates(
             csv_path,
             RENAMED_FOLDER,
             sender_email,
-            app_password,
+            sendgrid_api_key,
             subject,
+            email_body,   # ✅ PASSED HERE
             LOG_FILE
         )
 
-        if sent_count > 0 and failed_count == 0:
-            flash(f"✅ All certificates sent successfully ({sent_count})", "success")
-        elif sent_count > 0:
-            flash(f"⚠️ {sent_count} sent, {failed_count} failed", "warning")
-        else:
-            flash("❌ No emails were sent", "danger")
+        # Store results for result page
+        session["sent"] = sent_count
+        session["failed"] = failed_count
+        session["total"] = sent_count + failed_count
 
     except Exception as e:
         flash(f"❌ Error: {str(e)}", "danger")
+        return redirect(url_for("index"))
 
-    # ✅ REDIRECT TO RESULT PAGE (KEY FIX)
     return redirect(url_for("preview_result"))
 
-
+# ================= RUN =================
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)

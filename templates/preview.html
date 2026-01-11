@@ -76,13 +76,36 @@
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">App Password</label>
+                    <label class="form-label">SendGrid API Key</label>
                     <input type="password" name="app_password" class="form-control" required>
+                    <small class="text-muted">
+                        Paste your SendGrid API key (starts with <b>SG.</b>)
+                    </small>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">Email Subject</label>
                     <input type="text" name="subject" class="form-control" value="Your Certificate">
+                </div>
+
+                <!-- ✅ NEW: EMAIL CONTENT -->
+                <div class="mb-3">
+                    <label class="form-label">Email Content</label>
+                    <textarea
+                        name="email_body"
+                        class="form-control"
+                        rows="6"
+                        required
+                    >Hello {name},
+
+Thank you for participating in our event.
+Please find your certificate attached.
+
+Regards,
+Event Team</textarea>
+                    <small class="text-muted">
+                        Use <b>{name}</b> to personalize the email for each participant
+                    </small>
                 </div>
 
                 <!-- LOADER -->
