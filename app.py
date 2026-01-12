@@ -37,26 +37,47 @@ def preview():
         flash("CSV or certificates missing", "danger")
         return redirect(url_for("index"))
 
+    # ✅ Save CSV to disk FIRST
     csv_path = os.path.join(UPLOAD_CSV, csv_file.filename)
     csv_file.save(csv_path)
 
+    # ✅ Save certificates
     for f in cert_files:
         f.save(os.path.join(UPLOAD_CERTS, f.filename))
 
     preview_data = []
 
-    with open(csv_path, newline="", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
+    # ✅ ALWAYS open CSV from disk (never use csv_file again)
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+
         for idx, row in enumerate(reader, start=1):
             name = row["name"]
             email = row["email"]
 
+            filename_value = row.get("filename", "").strip()
             cert_name = "Missing"
-            for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
-                path = os.path.join(UPLOAD_CERTS, f"{idx}{ext}")
-                if os.path.exists(path):
-                    cert_name = f"{idx}{ext}"
-                    break
+
+            # 1️⃣ filename provided
+            if filename_value:
+                if filename_value.isdigit():
+                    for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
+                        path = os.path.join(UPLOAD_CERTS, f"{filename_value}{ext}")
+                        if os.path.exists(path):
+                            cert_name = f"{filename_value}{ext}"
+                            break
+                else:
+                    path = os.path.join(UPLOAD_CERTS, filename_value)
+                    if os.path.exists(path):
+                        cert_name = filename_value
+
+            # 2️⃣ fallback to index
+            if cert_name == "Missing":
+                for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
+                    path = os.path.join(UPLOAD_CERTS, f"{idx}{ext}")
+                    if os.path.exists(path):
+                        cert_name = f"{idx}{ext}"
+                        break
 
             preview_data.append({
                 "name": name,
@@ -70,6 +91,8 @@ def preview():
         preview_data=preview_data,
         csv_filename=csv_file.filename
     )
+
+
 
 # ================= RESULT =================
 @app.route("/preview-result")
@@ -129,5 +152,4 @@ def process():
 
 # ================= RUN =================
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
-
+    app.run(debug=True)
