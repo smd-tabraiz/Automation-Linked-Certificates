@@ -37,51 +37,50 @@ def preview():
         flash("CSV or certificates missing", "danger")
         return redirect(url_for("index"))
 
-    # ✅ Save CSV to disk FIRST
+    # Save CSV
     csv_path = os.path.join(UPLOAD_CSV, csv_file.filename)
     csv_file.save(csv_path)
 
-    # ✅ Save certificates
+    # Save certificates
     for f in cert_files:
         f.save(os.path.join(UPLOAD_CERTS, f.filename))
 
     preview_data = []
 
-    # ✅ ALWAYS open CSV from disk (never use csv_file again)
+    # 🔒 SAFE CSV READ (BOM + header normalization)
     with open(csv_path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
+        reader.fieldnames = [h.strip().lower() for h in reader.fieldnames]
 
-    # 🔥 Normalize headers
-    reader.fieldnames = [h.strip().lower() for h in reader.fieldnames]
+        for idx, row in enumerate(reader, start=1):
+            name = row["name"]
+            email = row["email"]
 
-    for idx, row in enumerate(reader, start=1):
-        name = row["name"]
-        email = row["email"]
+            filename_value = (row.get("filename") or "").strip()
+            cert_name = "Missing"
 
-        filename_value = (row.get("filename") or "").strip()
-        cert_name = "Missing"
-
-        # 1️⃣ filename provided
-        if filename_value:
-            if filename_value.isdigit():
-                for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
-                    path = os.path.join(UPLOAD_CERTS, f"{filename_value}{ext}")
+            # 1️⃣ filename column provided
+            if filename_value:
+                # numeric mapping: 3 → 3.png / 3.pdf
+                if filename_value.isdigit():
+                    for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
+                        path = os.path.join(UPLOAD_CERTS, f"{filename_value}{ext}")
+                        if os.path.exists(path):
+                            cert_name = f"{filename_value}{ext}"
+                            break
+                # exact filename
+                else:
+                    path = os.path.join(UPLOAD_CERTS, filename_value)
                     if os.path.exists(path):
-                        cert_name = f"{filename_value}{ext}"
+                        cert_name = filename_value
+
+            # 2️⃣ fallback to index-based mapping
+            if cert_name == "Missing":
+                for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
+                    path = os.path.join(UPLOAD_CERTS, f"{idx}{ext}")
+                    if os.path.exists(path):
+                        cert_name = f"{idx}{ext}"
                         break
-            else:
-                path = os.path.join(UPLOAD_CERTS, filename_value)
-                if os.path.exists(path):
-                    cert_name = filename_value
-
-        # 2️⃣ fallback to index
-        if cert_name == "Missing":
-            for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
-                path = os.path.join(UPLOAD_CERTS, f"{idx}{ext}")
-                if os.path.exists(path):
-                    cert_name = f"{idx}{ext}"
-                    break
-
 
             preview_data.append({
                 "name": name,
@@ -95,8 +94,6 @@ def preview():
         preview_data=preview_data,
         csv_filename=csv_file.filename
     )
-
-
 
 # ================= RESULT =================
 @app.route("/preview-result")
@@ -117,33 +114,29 @@ def process():
             return redirect(url_for("index"))
 
         sender_email = request.form["sender_email"]
-        sendgrid_api_key = request.form["app_password"]  # SendGrid API Key
+        sendgrid_api_key = request.form["app_password"]
         subject = request.form["subject"]
-        email_body = request.form.get("email_body", "")  # ✅ NEW
+        email_body = request.form.get("email_body", "")
         csv_filename = request.form["csv_filename"]
 
-        # Basic API key validation
         if not sendgrid_api_key.startswith("SG."):
             flash("Invalid SendGrid API Key", "danger")
             return redirect(url_for("index"))
 
         csv_path = os.path.join(UPLOAD_CSV, csv_filename)
 
-        # Rename certificates
         rename_certificates(csv_path, UPLOAD_CERTS, RENAMED_FOLDER)
 
-        # Send emails (UPDATED CALL)
         sent_count, failed_count = send_certificates(
             csv_path,
             RENAMED_FOLDER,
             sender_email,
             sendgrid_api_key,
             subject,
-            email_body,   # ✅ PASSED HERE
+            email_body,
             LOG_FILE
         )
 
-        # Store results for result page
         session["sent"] = sent_count
         session["failed"] = failed_count
         session["total"] = sent_count + failed_count
