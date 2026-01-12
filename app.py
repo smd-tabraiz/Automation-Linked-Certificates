@@ -48,36 +48,40 @@ def preview():
     preview_data = []
 
     # ✅ ALWAYS open CSV from disk (never use csv_file again)
-    with open(csv_path, newline="", encoding="utf-8") as f:
+    with open(csv_path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
 
-        for idx, row in enumerate(reader, start=1):
-            name = row["name"]
-            email = row["email"]
+    # 🔥 Normalize headers
+    reader.fieldnames = [h.strip().lower() for h in reader.fieldnames]
 
-            filename_value = row.get("filename", "").strip()
-            cert_name = "Missing"
+    for idx, row in enumerate(reader, start=1):
+        name = row["name"]
+        email = row["email"]
 
-            # 1️⃣ filename provided
-            if filename_value:
-                if filename_value.isdigit():
-                    for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
-                        path = os.path.join(UPLOAD_CERTS, f"{filename_value}{ext}")
-                        if os.path.exists(path):
-                            cert_name = f"{filename_value}{ext}"
-                            break
-                else:
-                    path = os.path.join(UPLOAD_CERTS, filename_value)
-                    if os.path.exists(path):
-                        cert_name = filename_value
+        filename_value = (row.get("filename") or "").strip()
+        cert_name = "Missing"
 
-            # 2️⃣ fallback to index
-            if cert_name == "Missing":
+        # 1️⃣ filename provided
+        if filename_value:
+            if filename_value.isdigit():
                 for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
-                    path = os.path.join(UPLOAD_CERTS, f"{idx}{ext}")
+                    path = os.path.join(UPLOAD_CERTS, f"{filename_value}{ext}")
                     if os.path.exists(path):
-                        cert_name = f"{idx}{ext}"
+                        cert_name = f"{filename_value}{ext}"
                         break
+            else:
+                path = os.path.join(UPLOAD_CERTS, filename_value)
+                if os.path.exists(path):
+                    cert_name = filename_value
+
+        # 2️⃣ fallback to index
+        if cert_name == "Missing":
+            for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
+                path = os.path.join(UPLOAD_CERTS, f"{idx}{ext}")
+                if os.path.exists(path):
+                    cert_name = f"{idx}{ext}"
+                    break
+
 
             preview_data.append({
                 "name": name,
