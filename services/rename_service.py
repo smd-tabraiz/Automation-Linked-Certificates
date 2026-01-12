@@ -12,12 +12,14 @@ def rename_certificates(
 ):
     os.makedirs(renamed_folder, exist_ok=True)
 
-    with open(csv_file, newline="", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
+    # 🔒 SAFE CSV READ (BOM + header normalization)
+    with open(csv_file, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        reader.fieldnames = [h.strip().lower() for h in reader.fieldnames]
 
         for index, row in enumerate(reader, start=1):
             name = clean_name(row["name"])
-            filename_value = row.get("filename", "").strip()
+            filename_value = (row.get("filename") or "").strip()
             found = False
 
             # 1️⃣ filename provided
@@ -55,4 +57,4 @@ def rename_certificates(
 
             # 3️⃣ not found at all
             if not found:
-                print(f"❌ Certificate missing for row {index} ({row['name']})")
+                print(f"❌ Certificate missing for row {index} ({row.get('name')})")
