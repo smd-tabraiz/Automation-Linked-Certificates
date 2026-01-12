@@ -47,21 +47,31 @@ def preview():
 
     preview_data = []
 
-    # 🔒 SAFE CSV READ (BOM + header normalization)
+    # ===== SAFE CSV READ (PRODUCTION STYLE) =====
     with open(csv_path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
-        reader.fieldnames = [h.strip().lower() for h in reader.fieldnames]
+
+        # Normalize headers
+        headers = [h.strip().lower() for h in reader.fieldnames]
+        reader.fieldnames = headers
+
+        # Auto-detect filename column
+        filename_col = None
+        for h in headers:
+            if h in ("filename", "file", "file_name"):
+                filename_col = h
+                break
 
         for idx, row in enumerate(reader, start=1):
             name = row["name"]
             email = row["email"]
 
-            filename_value = (row.get("filename") or "").strip()
+            filename_value = (row.get(filename_col) or "").strip() if filename_col else ""
             cert_name = "Missing"
 
-            # 1️⃣ filename column provided
+            # 1️⃣ filename logic
             if filename_value:
-                # numeric mapping: 3 → 3.png / 3.pdf
+                # numeric mapping
                 if filename_value.isdigit():
                     for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
                         path = os.path.join(UPLOAD_CERTS, f"{filename_value}{ext}")
@@ -74,7 +84,7 @@ def preview():
                     if os.path.exists(path):
                         cert_name = filename_value
 
-            # 2️⃣ fallback to index-based mapping
+            # 2️⃣ fallback to index
             if cert_name == "Missing":
                 for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
                     path = os.path.join(UPLOAD_CERTS, f"{idx}{ext}")
@@ -109,19 +119,11 @@ def preview_result():
 @app.route("/process", methods=["POST"])
 def process():
     try:
-        if "csv_filename" not in request.form:
-            flash("Please preview certificates before sending.", "danger")
-            return redirect(url_for("index"))
-
         sender_email = request.form["sender_email"]
         sendgrid_api_key = request.form["app_password"]
         subject = request.form["subject"]
         email_body = request.form.get("email_body", "")
         csv_filename = request.form["csv_filename"]
-
-        if not sendgrid_api_key.startswith("SG."):
-            flash("Invalid SendGrid API Key", "danger")
-            return redirect(url_for("index"))
 
         csv_path = os.path.join(UPLOAD_CSV, csv_filename)
 
@@ -147,6 +149,5 @@ def process():
 
     return redirect(url_for("preview_result"))
 
-# ================= RUN =================
 if __name__ == "__main__":
     app.run(debug=True)
